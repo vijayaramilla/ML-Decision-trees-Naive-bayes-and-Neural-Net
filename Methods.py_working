@@ -1,0 +1,219 @@
+import math
+import numpy as np
+from abc import ABCMeta, abstractmethod
+
+# abstract base class for defining labels
+class Label:
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def __str__(self): pass
+
+       
+class ClassificationLabel(Label):
+    def __init__(self, label):
+        #self.label_num = int(label)
+        self.label_str = str(label)
+        pass
+        
+    def __str__(self):
+        print self.label_str
+        pass
+
+# the feature vectors will be stored in dictionaries so that they can be sparse structures
+class FeatureVector:
+    def __init__(self):
+        self.feature_vec = {}
+        pass
+        
+    def add(self, index, value):
+        self.feature_vec[index] = value
+        pass
+        
+    def get(self, index):
+        val = self.feature_vec[index]
+        return val
+    
+    # Added to give the total number of features in the dictionary
+    def numFeatures(self):
+        return len(self.feature_vec)
+
+class Instance:
+    def __init__(self, feature_vector, label):
+        self._feature_vector = feature_vector
+        self._label = label
+
+# abstract base class for defining predictors
+class Predictor:
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def train(self, instances): pass
+
+    @abstractmethod
+    def predict(self, instance): pass
+
+
+#TODO: you must implement additional data structures for
+#the three algorithms specified in the hw4 PDF
+
+#for example, if you want to define a data structure for the
+#DecisionTree algorithm, you could write
+
+#class DecisionTree(Predictor):
+	# class code
+
+#Remember that if you subclass the Predictor base class, you must
+#include methods called train() and predict() in your subclasses
+
+class NaiveBayes(Predictor):
+    def __init__(self):
+        self.summaries = {}
+        self.class_priors = {}
+
+    def train(self, instances):
+        classes = {}
+        # Seperate the instances in to classes
+        for instance in instances:
+            label = str(instance._label.label_str)
+            if label not in self.class_priors:
+                self.class_priors[label] = 0
+                self.summaries[label] = {}
+                classes[label] = []
+            classes[label].append(instance)
+            self.class_priors[label] += 1
+        features = instances[0]._feature_vector.feature_vec.keys()
+
+        # Training
+        for label in self.class_priors:
+            self.class_priors[label] = self.class_priors[label] / float(len(instances))
+            for feature in features:
+                mean = self.cal_mean(classes[label], feature)
+                stdev = self.cal_stdev(classes[label], feature, mean)
+                self.summaries[label][feature] = mean, stdev
+
+    def cal_mean(self, instances, feature):  # Can be improved with np
+        s = 0
+        for instance in instances:
+            s += instance._feature_vector.feature_vec[feature]
+        return (1/float(len(instances))) * s
+
+    def cal_stdev(self, instances, feature, mean):  # Can be improved with np
+        sl = 0
+        for instance in instances:
+            sl += (instance._feature_vector.feature_vec[feature] - mean) ** 2
+        return (1/float(len(instances) - 1)) * sl
+
+    def calculateProbability(self, x, m):
+        mean, stdev = m
+        p = (1/np.sqrt(2*np.pi*stdev)) * np.exp((-1/(2*stdev))*(x - mean)**2)
+        return p
+
+    def predict(self, instance):
+        posteriors = {}
+        features = instance._feature_vector.feature_vec.keys()
+        for label in self.class_priors:
+            posteriors[label] = self.class_priors[label]
+            for feature in features:
+                posteriors[label] *= self.calculateProbability(instance._feature_vector.feature_vec[feature], self.summaries[label][feature])
+        return max(posteriors, key=posteriors.get)
+
+class DecisionTree(Predictor):
+        def __init__(self, summaries):
+            pass
+        def train(self, instances):
+            pass
+        def predict(self, instances):
+            pass
+class NeuralNetwork(Predictor):
+
+
+    def __init__(self):
+        self.samples = 0  # training set size
+        self.inputsize = 0  # input layer dimensionality
+        self.outputsize = 0  # output layer dimensionality
+        self.alpha = 0.002  # learning rate for gradient descent
+        self.regularization = 0.05  # regularization strength
+        self.classes = []
+        self.relate = {}
+        self.mat = 0
+        self.labels = []
+        self.neuralnet = 0
+        self.input_label_categories = []
+        self.epoch=2000
+
+    def sigmoid(self,x):
+        return 1 / (1 + np.exp(-x))
+
+    def result(self, x):
+        W1, b1, W2, b2 = self.neuralnet['W1'], self.neuralnet['b1'], self.neuralnet['W2'], self.neuralnet['b2']
+        val = np.argmax((np.exp((self.sigmoid(x.dot(W1) + b1)).dot(W2) + b2)) / 
+                np.sum((np.exp((self.sigmoid(x.dot(W1) + b1)).dot(W2) + b2)),
+                axis=1, keepdims=True),axis=1)
+        return val
+    
+    def train(self, instances):
+        temp_toto = []
+        for instance in instances:
+            label = str(instance._label.label_str)
+            if label not in self.classes:
+                self.classes.append(instance._label.label_str)
+                self.relate[len(self.classes) - 1] = instance._label.label_str
+            self.labels.append(instance._label.label_str)
+            temp = []
+            for i in xrange(instance._feature_vector.numFeatures()):
+                temp.append(float(instance._feature_vector.get(i)))
+            temp_toto.append(temp)
+            self.inputsize = len(temp)
+            self.outputsize = len(self.classes)
+        self.mat = np.array(temp_toto)
+        self.samples = len(self.mat)
+        for label in self.labels:
+            for i in xrange(0, len(self.relate)):
+                if label == self.relate[i]:
+                    self.input_label_categories.append(i)
+                    break
+
+        np.random.seed(1)
+        W1 = ( 2 * np.random.randn(self.inputsize, 20) / np.sqrt(self.inputsize) ) -1
+        b1 = np.zeros((1, 20))
+        W2 = ( 2 * np.random.randn(20, self.outputsize) / np.sqrt(20) )-1
+        b2 = np.zeros((1, self.outputsize))
+
+        neuralnet = {}
+
+        for i in range(1, self.epoch):
+
+            # Forward propagation
+            a1 = self.sigmoid(self.mat.dot(W1) + b1)
+            exp_scores = np.exp((self.sigmoid( np.dot(self.mat,W1) + b1)).dot(W2) + b2)
+            probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
+
+            # Backpropagation
+            delt = probs
+            delt[range(self.samples), self.input_label_categories] -= 1
+            dW2 = np.dot(a1.T,delt)
+            dW1 = np.dot(self.mat.T,  np.dot(delt,W2.T) * (1 - np.power(a1, 2)))
+
+            # Add regularization terms (b1 and b2 don't have regularization terms)
+            dW2 += self.regularization * W2
+            dW1 += self.regularization * W1
+
+            # Gradient descent parameter update
+            W1 = W1 - (self.alpha * dW1)
+            b1 = b1 - (self.alpha * np.sum(np.dot(delt,W2.T) * (1 - np.power(a1, 2)), axis=0))
+            W2 = W2 - (self.alpha * dW2)
+            b2 = b2 - (self.alpha * np.sum(delt, axis=0))
+
+            # Assign new parameters to the neuralnet
+            # neuralnet =
+        
+        self.neuralnet = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+
+    def predict(self, instance):
+        temp = []
+        for i in range(instance._feature_vector.numFeatures()):
+            temp.append(instance._feature_vector.feature_vec[i])
+            #print temp
+        return self.relate[self.result(np.array(temp))[0]]
+
